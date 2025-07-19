@@ -1,44 +1,23 @@
 import pygame
 from snake import SnakeGame
 from q_learning_agent import QLearningAgent
-import time
 import matplotlib.pyplot as plt
+import time
 
-# plt.ion()  # modo interativo ligado
-# fig, ax = plt.subplots()
-# linha, = ax.plot([], [])
-# ax.set_xlim(0, 1000)  # ajuste conforme número de episódios
-# ax.set_ylim(0, 50)    # ajuste conforme a pontuação esperada
-# ax.set_xlabel('Episódio')
-# ax.set_ylabel('Pontuação')
-# ax.set_title('Pontuação por Episódio')
-
-def atualizar_grafico(pontuacoes):
-    linha.set_xdata(range(len(pontuacoes)))
-    linha.set_ydata(pontuacoes)
-    ax.relim()
-    ax.autoscale_view()
-    # plt.draw()
-    # plt.pause(0.01)
-
-# Define ações
-# 0: virar à esquerda
-# 1: seguir reto
-# 2: virar à direita
 agent = QLearningAgent(
     actions=[0, 1, 2],
     epsilon=1.0,
-    epsilon_decay=0.9995,  # desacelere bastante
-    min_epsilon=0.01       # não deixe a IA ficar completamente determinística tão rápido
+    epsilon_decay=0.9995,
+    min_epsilon=0.01
 )
-MAX_PASSOS = 50
+
+MAX_PASSOS = 200
+
 direcoes = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 
 def direcao_discreta(direcao):
-    direcoes = [(0, -1), (1, 0), (0, 1), (-1, 0)]
     return direcoes.index(direcao)
 
-# Função para obter estado discreto
 def obter_estado(jogo):
     cabeca = jogo.snake[0]
     dir_x, dir_y = jogo.direcao
@@ -64,31 +43,27 @@ def obter_estado(jogo):
 
     dx_sign = 1 if fruta_x - cx > 0 else -1 if fruta_x - cx < 0 else 0
     dy_sign = 1 if fruta_y - cy > 0 else -1 if fruta_y - cy < 0 else 0
-    dist_fruta = abs(cx - fruta_x) + abs(cy - fruta_y)  # nova informação crítica
-
     dist_fruta = abs(cx - fruta_x) + abs(cy - fruta_y)
     dist_norm = round(dist_fruta / (jogo.largura + jogo.altura), 2)
 
     return (
-    colisao(pos_frente),
-    colisao(pos_esq),
-    colisao(pos_dir),
-    dx_sign,
-    dy_sign,
-    dist_norm,
-    direcao_discreta(jogo.direcao)
-)
+        colisao(pos_frente),
+        colisao(pos_esq),
+        colisao(pos_dir),
+        dx_sign,
+        dy_sign,
+        dist_norm,
+        direcao_discreta(jogo.direcao)
+    )
 
-# Aplica a ação escolhida pela IA
 def aplicar_acao(jogo, acao):
-    direcoes = [(0, -1), (1, 0), (0, 1), (-1, 0)]  # cima, direita, baixo, esquerda
     idx = direcoes.index(jogo.direcao)
 
     if acao == 0:
         jogo.direcao = direcoes[(idx - 1) % 4]
     elif acao == 2:
         jogo.direcao = direcoes[(idx + 1) % 4]
-    # ação 1 mantém a mesma direção
+    # ação 1 mantém direção atual
 
 def calcular_recompensa(jogo, estado, proximo_estado):
     if jogo.morto:
@@ -97,43 +72,39 @@ def calcular_recompensa(jogo, estado, proximo_estado):
     if jogo.snake[0] == jogo.fruta:
         return 100
 
-    recompensa = -1  # penalidade básica
+    recompensa = -1
 
-    # Penaliza se está girando em si mesmo
+    # Penalização por girar sobre si mesmo
     if jogo.historico_cabeca.count(jogo.snake[0]) > 2:
         recompensa -= 10
 
-    # Recompensa se está se aproximando da fruta
+    cabeca = jogo.snake[0]
+    if cabeca in jogo.snake[1:]:
+        recompensa -= 50
+
     dist_antes = estado[5]
     dist_depois = proximo_estado[5]
-    if dist_depois < dist_antes:
-        recompensa += 5
-    elif dist_depois > dist_antes:
-        recompensa -= 2
-
-    recompensa += 0.5
 
     if dist_depois < dist_antes:
-        recompensa += 10  # maior que antes
+        recompensa += 15
     elif dist_depois == dist_antes:
-        recompensa -= 1  # menos que se afastar
+        recompensa -= 1
     else:
-        recompensa -= 5  # se afastou da fruta
+        recompensa -= 5
 
     return recompensa
 
-def main(treinar=False):
-    TOTAL_JOGOS = 100000
-    if(treinar == False):
-        TOTAL_JOGOS = 1
-    jogo = SnakeGame()
-    pontuacoes = []
+def main(treinar=False, visualizar_final=True, n_jogos=100000):
     agent.carregar("qtable.pkl")
 
     if not treinar:
-        agent.epsilon = 0 
+        agent.epsilon = 0
+        n_jogos = 1
 
-    for episodio in range(1, TOTAL_JOGOS + 1):
+    pontuacoes = []
+
+    for episodio in range(1, n_jogos + 1):
+        jogo = SnakeGame(exibir=not treinar)
         jogo.resetar()
 
         while not jogo.morto:
@@ -151,42 +122,36 @@ def main(treinar=False):
                 agent.learn(estado, acao, recompensa, proximo_estado)
                 agent.update_epsilon()
 
-            # Treinamento sem exibir tela
-            if(treinar == True):
-                jogo.relogio.tick(0)
-            else:
-                # jogo.desenhar()
-                jogo.relogio.tick(60)
+            if not treinar:
+                jogo.desenhar()
+                jogo.tick()
 
         pontuacoes.append(jogo.pontuacao)
+
         if episodio % 100 == 0:
             media = sum(pontuacoes[-100:]) / 100
-            print(f"Episódio {episodio} | Última pontuação: {jogo.pontuacao} | Média 100: {media:.2f} | ε: {agent.epsilon:.3f}")
-        if(treinar == True):
+            print(f"Episódio {episodio} | Pontuação: {jogo.pontuacao} | Média 100: {media:.2f} | ε: {agent.epsilon:.3f}")
+
+        if treinar and episodio % 500 == 0:
             agent.salvar("qtable.pkl")
 
-    if(treinar == True):      
-        # Salvar a Q-table
+    if treinar:
         agent.salvar("qtable.pkl")
         print("Treinamento finalizado.")
 
-    # Loop final apenas para ver a IA jogando com ε = 0
-    agent.epsilon = 0
-    continuar = True
-    while continuar:
-        if(jogo.morto):
-            continuar = False
-        jogo = SnakeGame()
+    # Exibição final da IA jogando se desejado
+    if not treinar and visualizar_final:
+        jogo = SnakeGame(exibir=True)
         jogo.resetar()
         while not jogo.morto:
             estado = obter_estado(jogo)
             acao = agent.choose_action(estado)
             aplicar_acao(jogo, acao)
             jogo.atualizar()
-            if jogo.passos_sem_comer >= 40:
-                jogo.morto = True
             jogo.desenhar()
             jogo.tick()
 
 if __name__ == "__main__":
-    main()
+    # Para treinar: main(treinar=True)
+    # Para ver a IA jogando: main(treinar=False)
+    main(treinar=False)

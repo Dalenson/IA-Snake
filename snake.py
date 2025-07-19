@@ -1,5 +1,6 @@
 import pygame
 import random
+import os
 
 # Constantes
 TAMANHO_BLOCO = 20
@@ -14,18 +15,28 @@ VERMELHO = (255, 0, 0)
 BRANCO = (255, 255, 255)
 
 class SnakeGame:
-    def __init__(self):
-        pygame.init()
+    def __init__(self, exibir=True):
+        self.exibir = exibir
         self.largura = LARGURA
         self.altura = ALTURA
-        self.tela = pygame.display.set_mode((self.largura * TAMANHO_BLOCO, self.altura * TAMANHO_BLOCO))
-        pygame.display.set_caption("Snake com IA")
-        self.relogio = pygame.time.Clock()
-        self.fonte = pygame.font.SysFont(None, 24)
+        self.fonte = None
+
+        if self.exibir:
+            pygame.init()
+            self.tela = pygame.display.set_mode((self.largura * TAMANHO_BLOCO, self.altura * TAMANHO_BLOCO))
+            pygame.display.set_caption("Snake com IA")
+            self.relogio = pygame.time.Clock()
+            self.fonte = pygame.font.SysFont(None, 24)
+        else:
+            os.environ["SDL_VIDEODRIVER"] = "dummy"
+            pygame.init()
+            self.tela = None
+            self.relogio = pygame.time.Clock()
+
         self.resetar()
 
     def resetar(self):
-        self.snake = [(LARGURA // 2, ALTURA // 2)]
+        self.snake = [(self.largura // 2, self.altura // 2)]
         self.direcao = (0, -1)
         self.gerar_fruta()
         self.morto = False
@@ -36,13 +47,12 @@ class SnakeGame:
 
     def gerar_fruta(self):
         while True:
-            fruta = (random.randint(0, LARGURA - 1), random.randint(0, ALTURA - 1))
+            fruta = (random.randint(0, self.largura - 1), random.randint(0, self.altura - 1))
             if fruta not in self.snake:
                 self.fruta = fruta
                 break
 
     def virar(self, direcao):
-        # Impede virar para a direção oposta
         dx, dy = direcao
         cx, cy = self.direcao
         if (dx, dy) != (-cx, -cy):
@@ -51,23 +61,25 @@ class SnakeGame:
     def atualizar(self):
         if self.morto:
             return
-        
-        self.passos += 1 
+
+        self.passos += 1
 
         nova_cabeca = (self.snake[0][0] + self.direcao[0], self.snake[0][1] + self.direcao[1])
 
-        # Checa colisões
-        if (nova_cabeca in self.snake or
-            nova_cabeca[0] < 0 or nova_cabeca[0] >= LARGURA or
-            nova_cabeca[1] < 0 or nova_cabeca[1] >= ALTURA):
+        # Colisão
+        if (
+            nova_cabeca in self.snake or
+            nova_cabeca[0] < 0 or nova_cabeca[0] >= self.largura or
+            nova_cabeca[1] < 0 or nova_cabeca[1] >= self.altura
+        ):
             self.morto = True
             return
 
         self.snake.insert(0, nova_cabeca)
 
-        # Atualiza histórico da cabeça
+        # Histórico
         self.historico_cabeca.append(nova_cabeca)
-        if len(self.historico_cabeca) > 20:  # mantem só as últimas 20 posições
+        if len(self.historico_cabeca) > 20:
             self.historico_cabeca.pop(0)
 
         if nova_cabeca == self.fruta:
@@ -79,17 +91,30 @@ class SnakeGame:
             self.passos_sem_comer += 1
 
     def desenhar(self):
+        if not self.exibir:
+            return
+
         self.tela.fill(PRETO)
 
         for bloco in self.snake:
-            pygame.draw.rect(self.tela, VERDE, (bloco[0] * TAMANHO_BLOCO, bloco[1] * TAMANHO_BLOCO, TAMANHO_BLOCO, TAMANHO_BLOCO))
+            pygame.draw.rect(self.tela, VERDE, (
+                bloco[0] * TAMANHO_BLOCO,
+                bloco[1] * TAMANHO_BLOCO,
+                TAMANHO_BLOCO,
+                TAMANHO_BLOCO
+            ))
 
-        pygame.draw.rect(self.tela, VERMELHO, (self.fruta[0] * TAMANHO_BLOCO, self.fruta[1] * TAMANHO_BLOCO, TAMANHO_BLOCO, TAMANHO_BLOCO))
+        pygame.draw.rect(self.tela, VERMELHO, (
+            self.fruta[0] * TAMANHO_BLOCO,
+            self.fruta[1] * TAMANHO_BLOCO,
+            TAMANHO_BLOCO,
+            TAMANHO_BLOCO
+        ))
 
         texto = self.fonte.render(f"Pontos: {self.pontuacao}", True, BRANCO)
         self.tela.blit(texto, (10, 10))
-
         pygame.display.flip()
 
     def tick(self):
-        self.relogio.tick(FPS)
+        if self.exibir:
+            self.relogio.tick(FPS)
