@@ -40,56 +40,44 @@ def direcao_discreta(direcao):
 
 # Função para obter estado discreto
 def obter_estado(jogo):
-    cabeca = self.cobra[0]
-    dir_x, dir_y = self.direcao  # exemplo: (1, 0) → direita
-    
-    # Direções rotacionadas
+    cabeca = jogo.snake[0]
+    dir_x, dir_y = jogo.direcao
+
     esquerda = (-dir_y, dir_x)
     direita = (dir_y, -dir_x)
     frente = (dir_x, dir_y)
 
     def colisao(pos):
-        return pos in self.cobra or not (0 <= pos[0] < largura and 0 <= pos[1] < altura)
+        x, y = pos
+        return (
+            x < 0 or x >= jogo.largura or
+            y < 0 or y >= jogo.altura or
+            pos in jogo.snake
+        )
 
     pos_frente = (cabeca[0] + frente[0], cabeca[1] + frente[1])
-    pos_esquerda = (cabeca[0] + esquerda[0], cabeca[1] + esquerda[1])
-    pos_direita = (cabeca[0] + direita[0], cabeca[1] + direita[1])
+    pos_esq = (cabeca[0] + esquerda[0], cabeca[1] + esquerda[1])
+    pos_dir = (cabeca[0] + direita[0], cabeca[1] + direita[1])
 
-    perigo_frente = int(colisao(pos_frente))
-    perigo_esquerda = int(colisao(pos_esquerda))
-    perigo_direita = int(colisao(pos_direita))
+    fruta_x, fruta_y = jogo.fruta
+    cx, cy = cabeca
 
-    # Direção atual
-    dir_cima = int(self.direcao == (0, -1))
-    dir_baixo = int(self.direcao == (0, 1))
-    dir_esquerda = int(self.direcao == (-1, 0))
-    dir_direita = int(self.direcao == (1, 0))
+    dx_sign = 1 if fruta_x - cx > 0 else -1 if fruta_x - cx < 0 else 0
+    dy_sign = 1 if fruta_y - cy > 0 else -1 if fruta_y - cy < 0 else 0
+    dist_fruta = abs(cx - fruta_x) + abs(cy - fruta_y)  # nova informação crítica
 
-    # Comida em relação à cabeça
-    comida_x, comida_y = self.comida
-    cabeca_x, cabeca_y = cabeca
+    dist_fruta = abs(cx - fruta_x) + abs(cy - fruta_y)
+    dist_norm = round(dist_fruta / (jogo.largura + jogo.altura), 2)
 
-    comida_esquerda = int(comida_x < cabeca_x)
-    comida_direita = int(comida_x > cabeca_x)
-    comida_cima = int(comida_y < cabeca_y)
-    comida_baixo = int(comida_y > cabeca_y)
-
-    # Estado final como tupla imutável (boa para dicionário da Q-table)
-    estado = (
-        perigo_frente,
-        perigo_direita,
-        perigo_esquerda,
-        dir_cima,
-        dir_baixo,
-        dir_esquerda,
-        dir_direita,
-        comida_esquerda,
-        comida_direita,
-        comida_cima,
-        comida_baixo
-    )
-
-    return estado
+    return (
+    colisao(pos_frente),
+    colisao(pos_esq),
+    colisao(pos_dir),
+    dx_sign,
+    dy_sign,
+    dist_norm,
+    direcao_discreta(jogo.direcao)
+)
 
 # Aplica a ação escolhida pela IA
 def aplicar_acao(jogo, acao):
@@ -134,7 +122,7 @@ def calcular_recompensa(jogo, estado, proximo_estado):
 
     return recompensa
 
-def main(treinar=True):
+def main(treinar=False):
     TOTAL_JOGOS = 100000
     if(treinar == False):
         TOTAL_JOGOS = 1
